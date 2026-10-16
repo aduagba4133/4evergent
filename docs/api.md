@@ -170,6 +170,75 @@ Returns `{ "activity": ActivityRecord }`.
 
 ## Policy
 
+### `PolicyRules`
+
+`PolicyRules` is the complete policy shape returned by `GET /agents/:id/policy`.
+`PUT /agents/:id/policy` may omit fields: the API validates the supplied values
+and fills omitted fields from `DEFAULT_RULES` before storing them. The
+[policy limits table](security-model.md#spending-limits) summarizes the spending
+limits; the details below define the request fields.
+
+Amounts in `maxTxAmount`, `dailySpendingLimit`, `approvalThreshold`, and
+`requireHumanApprovalForAmountAbove` are JSON strings in the TypeScript type.
+The validator also accepts JSON numbers for these fields. Amounts must be finite;
+`maxTxAmount` entries must be greater than zero, while daily limits and approval
+thresholds may be zero or greater.
+
+| Field | Type | Meaning and format | Default |
+|---|---|---|---|
+| `maxTxAmount` | `Record<string, string>` | Per-transaction maximum, keyed by policy asset identifier. Each configured value must be positive. | `{ "XLM": "100" }` |
+| `dailySpendingLimit` | `Record<string, string>` | Per-agent daily limit, keyed by policy asset identifier. Each value must be non-negative. | `{ "XLM": "500" }` |
+| `allowedAssets` | `string[]` | Asset identifiers permitted by the policy. An empty array disables this allowlist check. | `["XLM"]` |
+| `allowedDestinations` | `string[]` | Payment destination account IDs. Entries must be 56-character strings beginning with `G`; an empty array disables the destination check. | `[]` |
+| `allowedContractIds` | `string[]` | Contract IDs permitted for contract calls. Entries must be non-empty strings; an empty array disables this allowlist check. | `[]` |
+| `txTypeRestrictions` | `Record<string, boolean>` | Supported keys are `payment`, `trustline`, `contract_call`, and `account_settings`. A type is permitted only when its value is `true`; unknown keys are invalid. | `{ "payment": true, "trustline": true, "contract_call": false, "account_settings": false }` |
+| `approvalThreshold` | `string` | Compatibility alias for the human-approval amount gate. If the canonical field below is omitted, normalization uses this value for it. | `"50"` |
+| `requireHumanApprovalForAmountAbove` | `string` | Effective human-approval threshold read by the policy engine. Amounts equal to or greater than this threshold require approval. | `"50"` |
+
+`maxTxAmount` and `dailySpendingLimit` keys, and `allowedAssets` entries, use
+the policy engine's normalized asset names: `XLM` for native XLM and
+`CODE:ISSUER` for an issued asset. This follows the
+[`PaymentAsset` representation](capabilities.md#asset-representation): native
+XLM has no issuer, while an issued asset is identified by its code and issuer.
+For trustline intents, the engine's identifier is
+`trustline:CODE:ISSUER`. When an exact per-asset spending-limit key is absent,
+the engine also supports a `native` fallback key. See
+[`extractAsset` and the policy checks](../packages/policy/src/engine.ts).
+
+`approvalThreshold` is retained as a compatibility alias. Normalization copies
+it to `requireHumanApprovalForAmountAbove` when the latter is omitted, and copies
+the canonical value back when only the canonical field is supplied. If both are
+provided with different values, the engine uses
+`requireHumanApprovalForAmountAbove`; it compares the transaction amount with
+`>=`, so an amount exactly at that effective threshold requires approval. See
+[`normalizePolicyRules`](../packages/policy/src/validation.ts) and the
+[approval check](../packages/policy/src/engine.ts). The zero-value validation
+boundary is tracked separately in [PR #101](https://github.com/naninu123/4evergent/pull/101).
+
+Example complete request body using the defaults:
+
+```json
+{
+  "maxTxAmount": { "XLM": "100" },
+  "dailySpendingLimit": { "XLM": "500" },
+  "allowedAssets": ["XLM"],
+  "allowedDestinations": [],
+  "allowedContractIds": [],
+  "txTypeRestrictions": {
+    "payment": true,
+    "trustline": true,
+    "contract_call": false,
+    "account_settings": false
+  },
+  "approvalThreshold": "50",
+  "requireHumanApprovalForAmountAbove": "50"
+}
+```
+
+The field types and defaults come from [`PolicyRules` and `DEFAULT_RULES`](../packages/policy/src/types.ts);
+the accepted values and the invalid-policy response are defined by
+[`validatePolicyRules`](../packages/policy/src/validation.ts).
+
 ### GET /agents/:id/policy
 
 Get the agent's effective policy rules (owner-scoped). Returns
