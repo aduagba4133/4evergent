@@ -582,6 +582,8 @@ export type { AuthorizationContext } from "./authorization.js";
 
 // Shared SQLite connection
 export {
+  EXPECTED_SCHEMA_VERSION,
+  runSchemaMigrations,
   getSharedConnection,
   getSchemaVersion,
   setSchemaVersion,

@@ -23,7 +23,7 @@ import type {
  * database server required. Data persists across process restarts in a file
  * at the path provided to the constructor.
  *
- * Schema is versioned in _meta (schema_version = 3). initSchema() is
+ * Schema is versioned in _meta (schema_version = 5). initSchema() is
  * idempotent and safe to call on every construction.
  */
 export class SQLiteActivityStore implements ActivityStore {
